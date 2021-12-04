@@ -139,22 +139,31 @@ window.addEventListener('DOMContentLoaded', function () {
     /**
      * Goes through a list of adoptables and returns the HTML based on the selected options.
      * @param {Object} params
-     * @param {Array} params.idsInTag - All adoptable IDs in the selected tag
-     * @param {Object} params.collection - All adoptables in a particular section; i.e. "I Need", "They Need", "Both Have"
-     * @param {Boolean} params.mySparesChecked - Check box value for "My collection - only spares and missing"
-     * @param {Boolean} params.theirSparesChecked - Check box value for "Their collection - only spares and missing"
+     * @param {Object} params.adopts - All adoptables in a particular section; i.e. "I Need", "They Need", "Both Have"
+     * @param {Array} [params.idsInTag = Object.keys(params.adopts)] - All adoptable IDs in the selected tag. If empty or undefined, then no tag was selected.
+     * @param {Boolean} [params.mySparesChecked] - Check box value for "My collection - only spares and missing"
+     * @param {Boolean} [params.theirSparesChecked] - Check box value for "Their collection - only spares and missing"
      * @returns {Promise}
      */
-    getFilteredAdoptables({ idsInTag, collection, mySparesChecked, theirSparesChecked }) {
+    getFilteredAdoptables({ adopts, idsInTag = [], mySparesChecked, theirSparesChecked }) {
+      const processAllAdopts = idsInTag.length === 0 && !mySparesChecked && !theirSparesChecked;
+      if (idsInTag.length === 0) {
+        idsInTag = Object.keys(adopts);
+      }
+
       return filterUtils.processLargeArray(idsInTag, (id, index, array) => {
-        if (Object.hasOwnProperty.call(collection, id)) {
+        if (processAllAdopts) {
+          return filterUtils.createTableRow(adopts[id]);
+        }
+
+        if (Object.hasOwnProperty.call(adopts, id)) {
           if (
-            (mySparesChecked && theirSparesChecked && collection[id].mine != 1 && collection[id].theirs != 1)
+            (mySparesChecked && theirSparesChecked && adopts[id].mine != 1 && adopts[id].theirs != 1)
             || (!mySparesChecked && !theirSparesChecked)
-            || (!mySparesChecked && collection[id].theirs != 1)
-            || (!theirSparesChecked && collection[id].mine != 1)
+            || (!mySparesChecked && adopts[id].theirs != 1)
+            || (!theirSparesChecked && adopts[id].mine != 1)
           ) {
-            return filterUtils.createTableRow(collection[id]);
+            return filterUtils.createTableRow(adopts[id]);
           } else {
             return null;
           }
@@ -164,7 +173,6 @@ window.addEventListener('DOMContentLoaded', function () {
 
     /**
      * @param {String} section - Possible values: iNeed|theyNeed|bothHave
-     * @returns {Element} el
      */
     createTableHeading(section) {
       const text = CONSTANTS.messages[section];
@@ -173,7 +181,7 @@ window.addEventListener('DOMContentLoaded', function () {
       el.classList.add('headingRow');
       el.id = id;
       el.innerHTML = `<td colspan="3">${text}</td>`;
-      return el;
+      CONSTANTS.elements.tableBody.appendChild(el);
     },
 
     clearTable() {
@@ -203,11 +211,11 @@ window.addEventListener('DOMContentLoaded', function () {
       };
 
       await filterUtils.clearTable();
-      CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading('iNeed'));
+      filterUtils.createTableHeading('iNeed');
       await loadRows(adoptableData.iNeed);
-      CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading('theyNeed'));
+      filterUtils.createTableHeading('theyNeed');
       await loadRows(adoptableData.theyNeed);
-      CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading('bothHave'));
+      filterUtils.createTableHeading('bothHave');
       return loadRows(adoptableData.bothHave); // Returns a promise
     },
 
@@ -320,7 +328,7 @@ window.addEventListener('DOMContentLoaded', function () {
       const mySparesChecked = filterFormData.get('my-spares-only');
       const theirSparesChecked = filterFormData.get('their-spares-only');
 
-      if (!tag) {
+      if (!tag && !mySparesChecked && !theirSparesChecked) {
         // Empty tag selected, so reset table to display all adopts
         filterUtils.showLoader();
         await filterUtils.clearFilter();
@@ -333,9 +341,11 @@ window.addEventListener('DOMContentLoaded', function () {
         let p2;
         // Fetching adoptable IDs in the tag, or re-using cached data
         if (filterData.lastSelectedTag.tag === tag) {
+          // Use cached data
           idsInTag = filterData.lastSelectedTag.ids;
           p2 = idsInTag;
-        } else {
+        } else if (tag) {
+          // Fetch tag IDs
           p2 = filterUtils.getIdsInTag(tag);
           idsInTag = await p2;
           filterData.lastSelectedTag.tag = tag;
@@ -346,10 +356,10 @@ window.addEventListener('DOMContentLoaded', function () {
         await Promise.all([p1, p2]);
 
         const createASection = (section) => {
-          CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading([section]));
+          filterUtils.createTableHeading([section]);
           return filterUtils.getFilteredAdoptables({
+            adopts: adoptableData[section],
             idsInTag,
-            collection: adoptableData[section],
             mySparesChecked,
             theirSparesChecked
           });
