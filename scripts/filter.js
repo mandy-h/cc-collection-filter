@@ -145,7 +145,7 @@ window.addEventListener('DOMContentLoaded', function () {
      * @param {Boolean} params.theirSparesChecked - Check box value for "Their collection - only spares and missing"
      * @returns {Promise}
      */
-    getFilteredAdoptables({ idsInTag, collection, mySparesChecked, theirSparesChecked }) {
+    getFilteredAdoptables({ idsInTag = filterData.adoptables, collection, mySparesChecked, theirSparesChecked }) {
       return filterUtils.processLargeArray(idsInTag, (id, index, array) => {
         if (Object.hasOwnProperty.call(collection, id)) {
           if (
@@ -171,9 +171,22 @@ window.addEventListener('DOMContentLoaded', function () {
     },
 
     clearTable() {
-      while (CONSTANTS.elements.tableBody.children.length > 1) { // Don't remove first heading row
-        CONSTANTS.elements.tableBody.removeChild(CONSTANTS.elements.tableBody.lastChild);
+      function removeRows() {
+        const rowCount = CONSTANTS.elements.tableBody.children.length;
+        let chunk = Math.min(rowCount - 1, 200); // Don't remove first heading row
+        while (chunk > 0) {
+          CONSTANTS.elements.tableBody.removeChild(CONSTANTS.elements.tableBody.lastChild);
+          chunk--;
+        }
+        return new Promise((resolve) => {
+          if (CONSTANTS.elements.tableBody.children.length > 1) {
+            return setTimeout(() => resolve(removeRows(), 0));
+          } else {
+            return resolve();
+          }
+        });
       }
+      return removeRows();
     },
 
     async clearFilter() {
@@ -183,7 +196,7 @@ window.addEventListener('DOMContentLoaded', function () {
         return filterUtils.processLargeArray(keys, (adoptId, index) => filterUtils.createTableRow(data[adoptId]));
       };
 
-      filterUtils.clearTable();
+      await filterUtils.clearTable();
       CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading(CONSTANTS.messages.iNeed, CONSTANTS.ids.iNeed));
       await loadRows(adoptableData.iNeed);
       CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading(CONSTANTS.messages.theyNeed, CONSTANTS.ids.theyNeed));
@@ -230,10 +243,12 @@ window.addEventListener('DOMContentLoaded', function () {
 
     showLoader() {
       document.querySelector('.loader').style.display = 'block';
+      document.querySelector('#filter-form input[type="submit"]').disabled = true;
     },
 
     hideLoader() {
       document.querySelector('.loader').style.display = 'none';
+      document.querySelector('#filter-form input[type="submit"]').disabled = false;
     }
   };
 
@@ -308,16 +323,21 @@ window.addEventListener('DOMContentLoaded', function () {
         // Tag selected, so display only the adopts that are in the tag
         let idsInTag;
         filterUtils.showLoader();
-        filterUtils.clearTable();
+        const p1 = filterUtils.clearTable();
+        let p2;
         // Fetching adoptable IDs in the tag, or re-using cached data
         if (filterData.lastSelectedTag.tag === tag) {
           idsInTag = filterData.lastSelectedTag.ids;
+          p2 = idsInTag;
         } else {
-          idsInTag = await filterUtils.getIdsInTag(tag);
+          p2 = filterUtils.getIdsInTag(tag);
+          idsInTag = await p2;
           filterData.lastSelectedTag.tag = tag;
           filterData.lastSelectedTag.ids = idsInTag;
         }
 
+        // Wait for p1 and p2 to finish before rendering the table
+        await Promise.all([p1, p2]);
         // Building "Adoptables you need" section
         CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading(CONSTANTS.messages.iNeed, CONSTANTS.ids.iNeed));
         await filterUtils.getFilteredAdoptables({
