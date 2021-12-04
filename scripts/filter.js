@@ -35,18 +35,22 @@ window.addEventListener('DOMContentLoaded', function () {
 
   const filterUtils = {
     /**
-     * Processes a large array in chunks so that it doesn't make the UI unresponsive.
+     * Renders a large number of rows in chunks so that it doesn't make the UI unresponsive for too long.
      * @param {Array} array
      * @param {Function} cb - A callback function that returns a table row
+     * @param {Number} maxTimePerChunk - Time per chunk, in milliseconds
      * @param {Number} [index = 0] - Starts processing the array from here
      * @returns {Promise}
      */
-    processLargeArray(array, cb, index = 0) {
+    processLargeArray(array, cb, maxTimePerChunk = 200, index = 0) {
+      function now() {
+        return new Date().getTime();
+      }
+
       function processChunk() {
-        const maxChunkSize = 100;
-        const chunk = Math.min(array.length, index + maxChunkSize);
+        const startTime = now();
         const fragment = new DocumentFragment();
-        while (index < chunk) {
+        while (index < array.length && (now() - startTime) <= maxTimePerChunk) {
           const row = cb(array[index], index, array);
           row && fragment.appendChild(row);
           index++;
@@ -63,6 +67,7 @@ window.addEventListener('DOMContentLoaded', function () {
           }
         });
       }
+
       return processChunk();
     },
 
@@ -172,7 +177,7 @@ window.addEventListener('DOMContentLoaded', function () {
     },
 
     /**
-     * @param {String} section - Possible values: iNeed|theyNeed|bothHave
+     * @param {('iNeed'|'theyNeed'|'bothHave')} section
      */
     createTableHeading(section) {
       const text = CONSTANTS.messages[section];
@@ -185,13 +190,19 @@ window.addEventListener('DOMContentLoaded', function () {
     },
 
     clearTable() {
+      function now() {
+        return new Date().getTime();
+      }
+
       function removeRows() {
-        const rowCount = CONSTANTS.elements.tableBody.children.length;
-        let chunk = Math.min(rowCount - 1, 200); // Don't remove first heading row
-        while (chunk > 0) {
+        const startTime = now();
+        const maxTimePerChunk = 200;
+        let rowCount = CONSTANTS.elements.tableBody.children.length;
+        while (rowCount > 1 && (now() - startTime) <= maxTimePerChunk) {
           CONSTANTS.elements.tableBody.removeChild(CONSTANTS.elements.tableBody.lastChild);
-          chunk--;
+          rowCount--;
         }
+
         return new Promise((resolve) => {
           if (CONSTANTS.elements.tableBody.children.length > 1) {
             return setTimeout(() => resolve(removeRows(), 0));
@@ -200,6 +211,7 @@ window.addEventListener('DOMContentLoaded', function () {
           }
         });
       }
+
       return removeRows();
     },
 
