@@ -145,7 +145,7 @@ window.addEventListener('DOMContentLoaded', function () {
      * @param {Boolean} params.theirSparesChecked - Check box value for "Their collection - only spares and missing"
      * @returns {Promise}
      */
-    getFilteredAdoptables({ idsInTag = filterData.adoptables, collection, mySparesChecked, theirSparesChecked }) {
+    getFilteredAdoptables({ idsInTag, collection, mySparesChecked, theirSparesChecked }) {
       return filterUtils.processLargeArray(idsInTag, (id, index, array) => {
         if (Object.hasOwnProperty.call(collection, id)) {
           if (
@@ -162,7 +162,13 @@ window.addEventListener('DOMContentLoaded', function () {
       });
     },
 
-    createTableHeading(text, id) {
+    /**
+     * @param {String} section - Possible values: iNeed|theyNeed|bothHave
+     * @returns {Element} el
+     */
+    createTableHeading(section) {
+      const text = CONSTANTS.messages[section];
+      const id = CONSTANTS.ids[section];
       const el = document.createElement('tr');
       el.classList.add('headingRow');
       el.id = id;
@@ -197,11 +203,11 @@ window.addEventListener('DOMContentLoaded', function () {
       };
 
       await filterUtils.clearTable();
-      CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading(CONSTANTS.messages.iNeed, CONSTANTS.ids.iNeed));
+      CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading('iNeed'));
       await loadRows(adoptableData.iNeed);
-      CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading(CONSTANTS.messages.theyNeed, CONSTANTS.ids.theyNeed));
+      CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading('theyNeed'));
       await loadRows(adoptableData.theyNeed);
-      CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading(CONSTANTS.messages.bothHave, CONSTANTS.ids.bothHave));
+      CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading('bothHave'));
       return loadRows(adoptableData.bothHave); // Returns a promise
     },
 
@@ -338,30 +344,20 @@ window.addEventListener('DOMContentLoaded', function () {
 
         // Wait for p1 and p2 to finish before rendering the table
         await Promise.all([p1, p2]);
-        // Building "Adoptables you need" section
-        CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading(CONSTANTS.messages.iNeed, CONSTANTS.ids.iNeed));
-        await filterUtils.getFilteredAdoptables({
-          idsInTag,
-          collection: adoptableData.iNeed,
-          mySparesChecked,
-          theirSparesChecked
-        });
-        // Building "Adoptables they need" section
-        CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading(CONSTANTS.messages.theyNeed, CONSTANTS.ids.theyNeed));
-        await filterUtils.getFilteredAdoptables({
-          idsInTag,
-          collection: adoptableData.theyNeed,
-          mySparesChecked,
-          theirSparesChecked
-        });
-        // Building "Adoptables you both have" section
-        CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading(CONSTANTS.messages.bothHave, CONSTANTS.ids.bothHave));
-        await filterUtils.getFilteredAdoptables({
-          idsInTag,
-          collection: adoptableData.bothHave,
-          mySparesChecked,
-          theirSparesChecked
-        });
+
+        const createASection = (section) => {
+          CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading([section]));
+          return filterUtils.getFilteredAdoptables({
+            idsInTag,
+            collection: adoptableData[section],
+            mySparesChecked,
+            theirSparesChecked
+          });
+        };
+
+        await createASection('iNeed');
+        await createASection('theyNeed');
+        await createASection('bothHave');
 
         filterUtils.hideLoader();
       }
