@@ -5,6 +5,10 @@ window.addEventListener('DOMContentLoaded', function () {
       iNeed: {},
       theyNeed: {},
       bothHave: {}
+    },
+    lastSelectedTag: {
+      tag: '',
+      ids: []
     }
   };
 
@@ -302,9 +306,17 @@ window.addEventListener('DOMContentLoaded', function () {
         filterUtils.hideLoader();
       } else {
         // Tag selected, so display only the adopts that are in the tag
+        let idsInTag;
         filterUtils.showLoader();
         filterUtils.clearTable();
-        const idsInTag = await filterUtils.getIdsInTag(tag);
+        // Fetching adoptable IDs in the tag, or re-using cached data
+        if (filterData.lastSelectedTag.tag === tag) {
+          idsInTag = filterData.lastSelectedTag.ids;
+        } else {
+          idsInTag = await filterUtils.getIdsInTag(tag);
+          filterData.lastSelectedTag.tag = tag;
+          filterData.lastSelectedTag.ids = idsInTag;
+        }
 
         // Building "Adoptables you need" section
         CONSTANTS.elements.tableBody.appendChild(filterUtils.createTableHeading(CONSTANTS.messages.iNeed, CONSTANTS.ids.iNeed));
