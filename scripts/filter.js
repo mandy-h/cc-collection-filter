@@ -71,7 +71,7 @@ window.addEventListener('DOMContentLoaded', function () {
       return processChunk();
     },
 
-    getTags() {
+    fetchTags() {
       return fetch('./adoptable_guide.php')
         .then((res) => res.text())
         .then((text) => {
@@ -81,6 +81,17 @@ window.addEventListener('DOMContentLoaded', function () {
             .map((link) => link.textContent);
           return tags;
         });
+    },
+
+    getStorageData(key) {
+      return new Promise((resolve, reject) => {
+        chrome.storage.local.get(key, (data) => {
+          if (chrome.runtime.lastError) {
+            return reject(chrome.runtime.lastError);
+          }
+          resolve(data);
+        });
+      });
     },
 
     getIdsInTag(tag) {
@@ -289,28 +300,28 @@ window.addEventListener('DOMContentLoaded', function () {
     `;
     document.querySelector('#megaContent center').insertBefore(filterWrapper, document.querySelector('.niceTable'));
 
-    const p = new Promise((resolve) => {
-      // Get adoptable guide tags
-      if (localStorage.getItem('adoptableGuideTags') === null) {
-        filterUtils.getTags().then((tags) => {
-          localStorage.setItem('adoptableGuideTags', JSON.stringify(tags));
-          resolve();
-        });
-      } else {
-        resolve();
-      }
-    });
-
-    p.then(() => {
+    // Get adoptable guide tags
+    filterUtils.getStorageData('adoptableGuideTags').then((data) => {
+      return new Promise((resolve, reject) => {
+        if (Object.keys(data).length === 0) {
+          filterUtils.fetchTags().then((tags) => {
+            chrome.storage.local.set({ 'adoptableGuideTags': tags });
+            resolve(tags);
+          });
+        } else {
+          resolve(data.adoptableGuideTags);
+        }
+      });
+    }).then((tags) => {
       // Append tags to dropdown
-      const tagsFragment = new DocumentFragment();
-      JSON.parse(localStorage.getItem('adoptableGuideTags')).forEach((tag) => {
+      const fragment = new DocumentFragment();
+      tags.forEach((tag) => {
         const option = document.createElement('option');
         option.value = tag;
         option.textContent = tag;
-        tagsFragment.appendChild(option);
+        fragment.appendChild(option);
       });
-      document.querySelector('#filter-form [name="tag"]').appendChild(tagsFragment);
+      document.querySelector('#filter-form [name="tag"]').appendChild(fragment);
     });
 
     // Get user IDs being compared
