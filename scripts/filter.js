@@ -42,7 +42,7 @@ window.addEventListener('DOMContentLoaded', function () {
      * @param {Number} [index = 0] - Starts processing the array from here
      * @returns {Promise}
      */
-    processLargeArray(array, cb, maxTimePerChunk = 200, index = 0) {
+    processLargeArray(array, cb, maxTimePerChunk = 100, index = 0) {
       function now() {
         return new Date().getTime();
       }
@@ -196,7 +196,7 @@ window.addEventListener('DOMContentLoaded', function () {
 
       function removeRows() {
         const startTime = now();
-        const maxTimePerChunk = 200;
+        const maxTimePerChunk = 100;
         let rowCount = CONSTANTS.elements.tableBody.children.length;
         while (rowCount > 1 && (now() - startTime) <= maxTimePerChunk) {
           CONSTANTS.elements.tableBody.removeChild(CONSTANTS.elements.tableBody.lastChild);
@@ -215,50 +215,15 @@ window.addEventListener('DOMContentLoaded', function () {
       return removeRows();
     },
 
-    addLoader() {
-      const loader = document.createElement('div');
-      loader.classList.add('loader');
-      loader.style.display = 'none';
-      loader.innerHTML = `<style>
-        .loader {
-          background-color: rgba(0, 0, 0, .7);
-          display: inline-block;
-          left: 50%;
-          position: fixed;
-          top: 50%;
-          z-index: 100;
-        }
-        .loader::after {
-          content: "";
-          display: block;
-          width: 48px;
-          height: 48px;
-          margin: 8px;
-          border-radius: 50%;
-          border: 6px solid #fff;
-          border-color: #fff transparent #fff transparent;
-          animation: lds-dual-ring 1.2s linear infinite;
-        }
-        @keyframes lds-dual-ring {
-          0% {
-            transform: rotate(0deg);
-          }
-          100% {
-            transform: rotate(360deg);
-          }
-        }
-        </style>`;
-      document.body.appendChild(loader);
-    },
-
-    showLoader() {
-      document.querySelector('.loader').style.display = 'block';
-      document.querySelector('#filter-form input[type="submit"]').disabled = true;
-    },
-
-    hideLoader() {
-      document.querySelector('.loader').style.display = 'none';
-      document.querySelector('#filter-form input[type="submit"]').disabled = false;
+    setLoaderVisibility(state) {
+      const loader = document.querySelector('.filter-loader');
+      if (state === 'show') {
+        loader.classList.add('is-shown');
+        document.querySelector('#filter-form [type="submit"]').disabled = true;
+      } else if (state === 'hide') {
+        loader.classList.remove('is-shown');
+        document.querySelector('#filter-form [type="submit"]').disabled = false;
+      }
     }
   };
 
@@ -269,16 +234,60 @@ window.addEventListener('DOMContentLoaded', function () {
     const filterWrapper = document.createElement('div');
     filterWrapper.id = 'collection-filter';
     filterWrapper.innerHTML = `
+      <style>
+        #filter-form {
+          display: inline-block;
+          margin: 1rem;
+          text-align: center;
+        }
+        #filter-form * {
+          margin-bottom: 4px;
+        }
+        #filter-form label {
+          display: block;
+        }
+        .filter-loader {
+          background-color: #eee;
+          height: 8px;
+          margin-top: 8px;
+          overflow: hidden;
+          position: relative;
+          visibility: hidden;
+        }
+        .filter-loader.is-shown {
+          visibility: visible;
+        }
+        .filter-loader__foreground {
+          animation: loading 1.2s ease-in-out forwards infinite;
+          animation-play-state: paused;
+          border-left: 24px solid #00bcd4;
+          height: 100%;
+          position: absolute;
+          width: 100%;
+        }
+        .filter-loader.is-shown > .filter-loader__foreground {
+          animation-play-state: running;
+        }
+        @keyframes loading {
+          0% {
+            transform: translateX(-24px);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }       
+      </style>
       <form id="filter-form">
-      <label style="display:block;">Filter by tag: <select name="tag"><option value=""></option></select></label>
-      <label style="display:block;">My collection - only spares and missing: <input type="checkbox" name="my-spares-only"/></label>
-      <label style="display:block;">Their collection - only spares and missing: <input type="checkbox" name="their-spares-only"/></label>
-      <input type="submit" value="Filter" />
-      </form>`;
-    filterWrapper.style.margin = '1rem';
+        <label>Filter by tag: <select name="tag"><option value=""></option></select></label>
+        <label>My collection - only spares and missing: <input type="checkbox" name="my-spares-only"/></label>
+        <label>Their collection - only spares and missing: <input type="checkbox" name="their-spares-only"/></label>
+        <button type="submit" value="Filter" class="filter-submit" />
+          Filter
+        </button>
+        <div class="filter-loader"><div class="filter-loader__foreground"></div></div>
+      </form>
+    `;
     document.querySelector('#megaContent center').insertBefore(filterWrapper, document.querySelector('.niceTable'));
-    // Append loader
-    filterUtils.addLoader();
 
     const p = new Promise((resolve) => {
       // Get adoptable guide tags
@@ -318,7 +327,7 @@ window.addEventListener('DOMContentLoaded', function () {
     // Form submit handler
     document.querySelector('#filter-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      filterUtils.showLoader();
+      filterUtils.setLoaderVisibility('show');
 
       // Defer all the stuff in here to give the loader a chance to appear on the page first
       setTimeout(async () => {
@@ -328,11 +337,9 @@ window.addEventListener('DOMContentLoaded', function () {
         const mySparesChecked = filterFormData.get('my-spares-only');
         const theirSparesChecked = filterFormData.get('their-spares-only');
 
-        // Tag selected, so display only the adopts that are in the tag
         let idsInTag;
         const p1 = filterUtils.clearTable();
         let p2;
-        // Fetching adoptable IDs in the tag, or re-using cached data
         if (filterData.lastSelectedTag.tag === tag) {
           // Use cached data
           idsInTag = filterData.lastSelectedTag.ids;
@@ -362,7 +369,7 @@ window.addEventListener('DOMContentLoaded', function () {
         await createASection('theyNeed');
         await createASection('bothHave');
 
-        filterUtils.hideLoader();
+        filterUtils.setLoaderVisibility('hide');
       }, 0);
     });
   })();
