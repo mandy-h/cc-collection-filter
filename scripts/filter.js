@@ -43,14 +43,10 @@ window.addEventListener('DOMContentLoaded', function () {
      * @returns {Promise}
      */
     processLargeArray(array, cb, maxTimePerChunk = 100, index = 0) {
-      function now() {
-        return new Date().getTime();
-      }
-
       function processChunk() {
-        const startTime = now();
+        const startTime = Date.now();
         const fragment = new DocumentFragment();
-        while (index < array.length && (now() - startTime) <= maxTimePerChunk) {
+        while (index < array.length && (Date.now() - startTime) <= maxTimePerChunk) {
           const row = cb(array[index], index, array);
           row && fragment.appendChild(row);
           index++;
@@ -71,7 +67,7 @@ window.addEventListener('DOMContentLoaded', function () {
       return processChunk();
     },
 
-    getTags() {
+    fetchTags() {
       return fetch('./adoptable_guide.php')
         .then((res) => res.text())
         .then((text) => {
@@ -81,6 +77,17 @@ window.addEventListener('DOMContentLoaded', function () {
             .map((link) => link.textContent);
           return tags;
         });
+    },
+
+    getStorageData(key) {
+      return new Promise((resolve, reject) => {
+        chrome.storage.local.get(key, (data) => {
+          if (chrome.runtime.lastError) {
+            return reject(chrome.runtime.lastError);
+          }
+          resolve(data);
+        });
+      });
     },
 
     getIdsInTag(tag) {
@@ -190,15 +197,11 @@ window.addEventListener('DOMContentLoaded', function () {
     },
 
     clearTable() {
-      function now() {
-        return new Date().getTime();
-      }
-
       function removeRows() {
-        const startTime = now();
+        const startTime = Date.now();
         const maxTimePerChunk = 100;
         let rowCount = CONSTANTS.elements.tableBody.children.length;
-        while (rowCount > 1 && (now() - startTime) <= maxTimePerChunk) {
+        while (rowCount > 1 && (Date.now() - startTime) <= maxTimePerChunk) {
           CONSTANTS.elements.tableBody.removeChild(CONSTANTS.elements.tableBody.lastChild);
           rowCount--;
         }
@@ -230,6 +233,26 @@ window.addEventListener('DOMContentLoaded', function () {
   /* ========== Main code ========== */
 
   (function init() {
+    // Get adoptable guide tags
+    const p = filterUtils.getStorageData(['adoptableGuideTags', 'tagDataLastRefreshed'])
+      .then((data) => {
+        // Return another promise to return the resolved value to the .then() in the chain
+        return new Promise((resolve, reject) => {
+          const expirationDuration = 1000 * 60 * 60 * 24 * 14; // 14 days
+          const currentTime = Date.now();
+          const refreshData = currentTime - data.tagDataLastRefreshed > expirationDuration;
+          if (!data.adoptableGuideTags || refreshData) {
+            filterUtils.fetchTags().then((tags) => {
+              chrome.storage.local.set({ 'adoptableGuideTags': tags });
+              chrome.storage.local.set({ 'tagDataLastRefreshed': currentTime });
+              resolve(tags);
+            });
+          } else {
+            resolve(data.adoptableGuideTags);
+          }
+        });
+      });
+
     // Append form elements to page
     const filterWrapper = document.createElement('div');
     filterWrapper.id = 'collection-filter';
@@ -289,28 +312,16 @@ window.addEventListener('DOMContentLoaded', function () {
     `;
     document.querySelector('#megaContent center').insertBefore(filterWrapper, document.querySelector('.niceTable'));
 
-    const p = new Promise((resolve) => {
-      // Get adoptable guide tags
-      if (localStorage.getItem('adoptableGuideTags') === null) {
-        filterUtils.getTags().then((tags) => {
-          localStorage.setItem('adoptableGuideTags', JSON.stringify(tags));
-          resolve();
-        });
-      } else {
-        resolve();
-      }
-    });
-
-    p.then(() => {
+    p.then((tags) => {
       // Append tags to dropdown
-      const tagsFragment = new DocumentFragment();
-      JSON.parse(localStorage.getItem('adoptableGuideTags')).forEach((tag) => {
+      const fragment = new DocumentFragment();
+      tags.forEach((tag) => {
         const option = document.createElement('option');
         option.value = tag;
         option.textContent = tag;
-        tagsFragment.appendChild(option);
+        fragment.appendChild(option);
       });
-      document.querySelector('#filter-form [name="tag"]').appendChild(tagsFragment);
+      document.querySelector('#filter-form [name="tag"]').appendChild(fragment);
     });
 
     // Get user IDs being compared

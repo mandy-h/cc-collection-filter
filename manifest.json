@@ -4,6 +4,9 @@
   "version": "1.0",
   "author": "mandy-h",
   "description": "Adds a form on the collection comparison page to allow advanced filtering.",
+  "permissions": [
+    "storage"
+  ],
   "host_permissions": [
     "https://www.clickcritters.com/compare_collections.php?compareto=*"
   ],
