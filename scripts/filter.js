@@ -316,50 +316,54 @@ window.addEventListener('DOMContentLoaded', function () {
     filterData.adoptables.bothHave = filterUtils.processAdoptableRows(filterData.adoptables.bothHave, CONSTANTS.elements.bothHaveHeading);
 
     // Form submit handler
-    document.querySelector('#filter-form').addEventListener('submit', async (e) => {
+    document.querySelector('#filter-form').addEventListener('submit', (e) => {
       e.preventDefault();
-      const adoptableData = filterData.adoptables;
-      const filterFormData = new FormData(document.querySelector('#filter-form'));
-      const tag = filterFormData.get('tag');
-      const mySparesChecked = filterFormData.get('my-spares-only');
-      const theirSparesChecked = filterFormData.get('their-spares-only');
-
-      // Tag selected, so display only the adopts that are in the tag
-      let idsInTag;
       filterUtils.showLoader();
-      const p1 = filterUtils.clearTable();
-      let p2;
-      // Fetching adoptable IDs in the tag, or re-using cached data
-      if (filterData.lastSelectedTag.tag === tag) {
-        // Use cached data
-        idsInTag = filterData.lastSelectedTag.ids;
-        p2 = idsInTag;
-      } else if (tag) {
-        // Fetch tag IDs
-        p2 = filterUtils.getIdsInTag(tag);
-        idsInTag = await p2;
-        filterData.lastSelectedTag.tag = tag;
-        filterData.lastSelectedTag.ids = idsInTag;
-      }
 
-      // Wait for p1 and p2 to finish before rendering the table
-      await Promise.all([p1, p2]);
+      // Defer all the stuff in here to give the loader a chance to appear on the page first
+      setTimeout(async () => {
+        const adoptableData = filterData.adoptables;
+        const filterFormData = new FormData(document.querySelector('#filter-form'));
+        const tag = filterFormData.get('tag');
+        const mySparesChecked = filterFormData.get('my-spares-only');
+        const theirSparesChecked = filterFormData.get('their-spares-only');
 
-      const createASection = (section) => {
-        filterUtils.createTableHeading([section]);
-        return filterUtils.getFilteredAdoptables({
-          adopts: adoptableData[section],
-          idsInTag,
-          mySparesChecked,
-          theirSparesChecked
-        });
-      };
+        // Tag selected, so display only the adopts that are in the tag
+        let idsInTag;
+        const p1 = filterUtils.clearTable();
+        let p2;
+        // Fetching adoptable IDs in the tag, or re-using cached data
+        if (filterData.lastSelectedTag.tag === tag) {
+          // Use cached data
+          idsInTag = filterData.lastSelectedTag.ids;
+          p2 = idsInTag;
+        } else if (tag) {
+          // Fetch tag IDs
+          p2 = filterUtils.getIdsInTag(tag);
+          idsInTag = await p2;
+          filterData.lastSelectedTag.tag = tag;
+          filterData.lastSelectedTag.ids = idsInTag;
+        }
 
-      await createASection('iNeed');
-      await createASection('theyNeed');
-      await createASection('bothHave');
+        // Wait for p1 and p2 to finish before rendering the table
+        await Promise.all([p1, p2]);
 
-      filterUtils.hideLoader();
+        const createASection = (section) => {
+          filterUtils.createTableHeading([section]);
+          return filterUtils.getFilteredAdoptables({
+            adopts: adoptableData[section],
+            idsInTag,
+            mySparesChecked,
+            theirSparesChecked
+          });
+        };
+
+        await createASection('iNeed');
+        await createASection('theyNeed');
+        await createASection('bothHave');
+
+        filterUtils.hideLoader();
+      }, 0);
     });
   })();
 });
