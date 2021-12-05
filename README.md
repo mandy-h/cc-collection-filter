@@ -11,3 +11,4 @@ A Chrome extension that adds filtering options on the collection comparison page
 
 # Additional Notes
 * Guide tags are cached in the browser for 14 days. So it is possible that a recently added tag will not appear in the dropdown menu until that data is refreshed. If you want to manually refresh the data, remove the extension and install it again.
+* If a tag isn't on the guide home page, it will not appear in the dropdown. Usually this applies to tags that have very few adoptables in them.
