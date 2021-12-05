@@ -8,3 +8,6 @@ A Chrome extension that adds filtering options on the collection comparison page
 5. Click on the **Load unpacked** button.
 6. Select the folder you just created.
 7. Make sure this extension is enabled.
+
+# Additional Notes
+* Guide tags are cached in the browser for 14 days. So it is possible that a recently added tag will not appear in the dropdown menu until that data is refreshed. If you want to manually refresh the data, remove the extension and install it again.
